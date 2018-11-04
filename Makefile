@@ -27,7 +27,7 @@ lint:
 	cargo clippy
 
 profile: target/release/cake
-	valgrind --callgrind-out-file=callgrind.profile --tool=callgrind  $< < tests/fixtures/valid.input >/dev/null
+	valgrind --callgrind-out-file=callgrind.profile --tool=callgrind  $< < tests/fixtures/valid-big.input >/dev/null
 	callgrind_annotate --auto=yes callgrind.profile
 
 benchmark: target/release/cake

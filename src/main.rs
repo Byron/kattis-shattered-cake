@@ -1,16 +1,11 @@
 mod parse {
-    use super::MAX_LENGTH;
-
-    use std::io::{self, BufRead};
-    use std::num::ParseIntError;
+    use std::io;
 
     #[derive(Debug)]
     pub enum Error {
         Exhausted,
         Io(io::Error),
-        InvalidInt(ParseIntError),
         InvalidDomain(u32, u32),
-        InvalidPiece(String),
     }
 
     impl From<io::Error> for Error {
@@ -18,75 +13,71 @@ mod parse {
             Error::Io(err)
         }
     }
-    impl From<ParseIntError> for Error {
-        fn from(err: ParseIntError) -> Self {
-            Error::InvalidInt(err)
-        }
-    }
 
-    pub fn two_u32_max_10k(
-        input: &mut impl BufRead,
-        buf: &mut String,
+    const DIGIT_POWER: [u32; 7] = [1, 10, 100, 1000, 10_000, 100_000, 1_000_000];
+
+    pub fn two_digits(
+        input: &[u8],
+        max_value: u32,
+        max_digits: usize,
     ) -> Result<(u32, u32), Error> {
-        buf.clear();
-        if input.read_line(buf)? == 0 {
-            return Err(Error::Exhausted);
-        }
-
-        let mut splits = buf.split_whitespace();
+        let mut splits = input.split(|b| *b == b' ');
         match (splits.next(), splits.next()) {
             (Some(w), Some(l)) => Ok((
-                w.parse()
-                    .map_err(Error::from)
-                    .and_then(|v| max_of(v, MAX_LENGTH))?,
-                l.parse()
-                    .map_err(Error::from)
-                    .and_then(|v| max_of(v, MAX_LENGTH))?,
+                single_digit(w, max_value, max_digits)?,
+                single_digit(l, max_value, max_digits)?,
             )),
-            _ => Err(Error::InvalidPiece(buf.to_owned())),
+            _ => Err(Error::Exhausted),
         }
     }
-
-    pub fn single_u32(input: &mut impl BufRead, buf: &mut String) -> Result<u32, Error> {
-        buf.clear();
-        if input.read_line(buf)? == 0 {
-            Err(Error::Exhausted)
+    pub fn single_digit(input: &[u8], max_value: u32, max_digits: usize) -> Result<u32, Error> {
+        let res = input
+            .iter()
+            .rev()
+            .take(max_digits)
+            .take_while(|b| match b {
+                b'0'..=b'9' => true,
+                _ => false,
+            })
+            .map(|b| b - b'0')
+            .enumerate()
+            .fold(0, |mut acc, (index, b10)| {
+                acc += DIGIT_POWER[index] * b10 as u32;
+                acc
+            });
+        if res > max_value {
+            Err(Error::InvalidDomain(res, max_value))
         } else {
-            buf.trim_right().parse().map_err(Error::from)
-        }
-    }
-    pub fn max_of(v: u32, max: u32) -> Result<u32, Error> {
-        if v > max || v == 0 {
-            Err(Error::InvalidDomain(v, max))
-        } else {
-            Ok(v)
+            Ok(res)
         }
     }
 }
 
-use std::io::{stdin, stdout, BufReader, Write};
+use parse::Error;
+use std::io::{stdin, stdout, Read, Write};
 pub const MAX_LENGTH: u32 = 10_000;
+pub const MAX_PIECES: u32 = 5_000_000;
 
-use parse::max_of;
-
-fn main() -> Result<(), parse::Error> {
-    let stdin = stdin();
-    let stdin_lock = stdin.lock();
-    let mut reader = BufReader::new(stdin_lock);
-
-    let mut line_buf = String::new();
-
-    let cake_width =
-        parse::single_u32(&mut reader, &mut line_buf).and_then(|v| max_of(v, MAX_LENGTH))?;
+fn main() -> Result<(), Error> {
+    let mut buf = Vec::new();
+    stdin().read_to_end(&mut buf)?;
+    let mut lines = buf.split(|b| *b == b'\n');
+    let cake_width = parse::single_digit(lines.next().ok_or(Error::Exhausted)?, MAX_LENGTH, 5)?;
     let num_pieces =
-        parse::single_u32(&mut reader, &mut line_buf).and_then(|v| max_of(v, 5_000_000))?;
+        parse::single_digit(lines.next().ok_or(Error::Exhausted)?, MAX_PIECES, 7)? as usize;
 
+    let mut line_count = 0;
     let mut area_so_far = 0_u64;
-    for _ in 0..num_pieces {
-        let (w, l) = parse::two_u32_max_10k(&mut reader, &mut line_buf)?;
+    for line in lines.take(num_pieces) {
+        let (w, l) = parse::two_digits(line, MAX_LENGTH, 5)?;
         area_so_far += (w * l) as u64;
+        line_count += 1;
     }
-    let cake_length = area_so_far / cake_width as u64;
-    writeln!(stdout(), "{}", cake_length)?;
-    Ok(())
+    if line_count != num_pieces {
+        Err(Error::Exhausted)
+    } else {
+        let cake_length = area_so_far / cake_width as u64;
+        writeln!(stdout(), "{}", cake_length)?;
+        Ok(())
+    }
 }
