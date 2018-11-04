@@ -64,24 +64,26 @@ mod parse {
     }
 }
 
-use std::io::{stdin, stdout, Write};
+use std::io::{stdin, stdout, BufReader, Write};
 pub const MAX_LENGTH: u32 = 10_000;
 
 use parse::max_of;
 
 fn main() -> Result<(), parse::Error> {
     let stdin = stdin();
-    let mut stdin_lock = stdin.lock();
+    let stdin_lock = stdin.lock();
+    let mut reader = BufReader::new(stdin_lock);
+
     let mut line_buf = String::new();
 
     let cake_width =
-        parse::single_u32(&mut stdin_lock, &mut line_buf).and_then(|v| max_of(v, MAX_LENGTH))?;
+        parse::single_u32(&mut reader, &mut line_buf).and_then(|v| max_of(v, MAX_LENGTH))?;
     let num_pieces =
-        parse::single_u32(&mut stdin_lock, &mut line_buf).and_then(|v| max_of(v, 5_000_000))?;
+        parse::single_u32(&mut reader, &mut line_buf).and_then(|v| max_of(v, 5_000_000))?;
 
     let mut area_so_far = 0_u64;
     for _ in 0..num_pieces {
-        let (w, l) = parse::two_u32_max_10k(&mut stdin_lock, &mut line_buf)?;
+        let (w, l) = parse::two_u32_max_10k(&mut reader, &mut line_buf)?;
         area_so_far += (w * l) as u64;
     }
     let cake_length = area_so_far / cake_width as u64;
