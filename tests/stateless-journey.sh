@@ -18,4 +18,10 @@ SUCCESSFULLY=0
       expect_run ${SUCCESSFULLY} "$exe" < "$fixture/valid.input"
     }
   )
+  (when "the input is well formed and huge"
+    it "produces the expected output" && {
+      WITH_SNAPSHOT="$snapshot/success-input-file-produces-correct-output-huge" \
+      expect_run ${SUCCESSFULLY} "$exe" < "$fixture/valid-big.input"
+    }
+  )
 )
