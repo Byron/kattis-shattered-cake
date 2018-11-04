@@ -3,7 +3,6 @@ mod parse {
 
     #[derive(Debug)]
     pub enum Error {
-        Exhausted,
         Io(io::Error),
         InvalidDomain(u32, u32),
     }
@@ -17,25 +16,34 @@ mod parse {
     const DIGIT_POWER: [u32; 7] = [1, 10, 100, 1000, 10_000, 100_000, 1_000_000];
 
     #[inline(always)]
-    pub fn two_digits(input: &[u8], max_value: u32) -> Result<(u32, u32), Error> {
-        let mut splits = input.split(|b| *b == b' ');
-        match (splits.next(), splits.next()) {
-            (Some(w), Some(l)) => Ok((single_digit(w, max_value)?, single_digit(l, max_value)?)),
-            _ => Err(Error::Exhausted),
+    pub fn digit_stop_at(
+        input: &[u8],
+        max_value: u32,
+        stop_byte: u8,
+    ) -> Result<(u32, &[u8]), Error> {
+        let mut digits = [0; 7];
+        let mut num_digits = 0;
+        for d in input
+            .iter()
+            .take_while(|&&b| b != stop_byte)
+            .map(|b| b - b'0')
+        {
+            digits[num_digits] = d;
+            num_digits += 1;
         }
-    }
-    #[inline(always)]
-    pub fn single_digit(input: &[u8], max_value: u32) -> Result<u32, Error> {
-        let res = input
+
+        let res = digits[..num_digits]
             .iter()
             .rev()
-            .map(|b| b - b'0')
             .enumerate()
-            .fold(0, |acc, (index, b10)| acc + DIGIT_POWER[index] * b10 as u32);
+            .fold(0, |acc, (index, &b10)| {
+                acc + DIGIT_POWER[index] * b10 as u32
+            });
+
         if res > max_value {
             Err(Error::InvalidDomain(res, max_value))
         } else {
-            Ok(res)
+            Ok((res, &input[num_digits + 1..]))
         }
     }
 }
@@ -48,23 +56,19 @@ pub const MAX_PIECES: u32 = 5_000_000;
 fn main() -> Result<(), Error> {
     let mut buf = Vec::with_capacity(1024 * 1024);
     stdin().read_to_end(&mut buf)?;
-    let mut lines = buf.split(|b| *b == b'\n');
-    let cake_width = parse::single_digit(lines.next().ok_or(Error::Exhausted)?, MAX_LENGTH)?;
-    let num_pieces =
-        parse::single_digit(lines.next().ok_or(Error::Exhausted)?, MAX_PIECES)? as usize;
+    let (cake_width, cursor) = parse::digit_stop_at(&buf, MAX_LENGTH, b'\n')?;
+    let (num_pieces, mut cursor) = parse::digit_stop_at(&cursor, MAX_PIECES, b'\n')?;
+    let num_pieces = num_pieces as usize;
 
-    let mut line_count = 0;
     let mut area_so_far = 0_u64;
-    for line in lines.take(num_pieces) {
-        let (w, l) = parse::two_digits(line, MAX_LENGTH)?;
+    for _ in 0..num_pieces {
+        let (w, ncursor) = parse::digit_stop_at(cursor, MAX_LENGTH, b' ')?;
+        let (l, ncursor) = parse::digit_stop_at(ncursor, MAX_LENGTH, b'\n')?;
+        cursor = ncursor;
         area_so_far += (w * l) as u64;
-        line_count += 1;
     }
-    if line_count != num_pieces {
-        Err(Error::Exhausted)
-    } else {
-        let cake_length = area_so_far / cake_width as u64;
-        writeln!(stdout(), "{}", cake_length)?;
-        Ok(())
-    }
+
+    let cake_length = area_so_far / cake_width as u64;
+    writeln!(stdout(), "{}", cake_length)?;
+    Ok(())
 }
