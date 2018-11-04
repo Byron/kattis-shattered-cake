@@ -59,7 +59,7 @@ pub const MAX_LENGTH: u32 = 10_000;
 pub const MAX_PIECES: u32 = 5_000_000;
 
 fn main() -> Result<(), Error> {
-    let mut buf = Vec::new();
+    let mut buf = Vec::with_capacity(1024 * 1024);
     stdin().read_to_end(&mut buf)?;
     let mut lines = buf.split(|b| *b == b'\n');
     let cake_width = parse::single_digit(lines.next().ok_or(Error::Exhausted)?, MAX_LENGTH, 5)?;
